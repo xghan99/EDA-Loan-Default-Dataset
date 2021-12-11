@@ -1,0 +1,118 @@
+---
+title: "EDA Loan Default Dataset"
+author: "Han Xiao Guang"
+date: "12/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This dataset is obtained from Kaggle (https://www.kaggle.com/ankitkalauni/bank-loan-defaulter-prediction-hackathon/version/1?select=train.csv) and is part of the Machine-Hack Deloitte Hackathon. It contains various attributes of the loans customers have taken with the bank and whether they ended up defaulting on the loan. I will be performing Exploratory Data Analysis on the dataset to evaluate the relationships between the different attributes and its effect on whether a customer defaults on the loan.
+
+## Importing Packages
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(Hmisc)
+```
+
+For this analysis, I would be utilising dplyr and ggplot2 from the tidyverse package to transform and visualise the data. The Hmisc package is used for obtaining a general summary of the different columns in the dataset. 
+
+## Loading and Cleaning the Dataset
+```{r echo=TRUE, results='hide'}
+loan <- read.csv("../data/loan.csv")
+describe(loan)
+#Output omitted to save space
+```
+
+There are no missing values in any of the columns. There are also no duplicate entries as the number of distinct IDs is equal to the number of IDs. However, there seems to be an error where columns of Employment Duration and Home Ownership are swapped. For the Verification.Status column, which describes the income verification by the bank, there are 2 labels "Source Verified" and "Verified", which seem to mean the same thing. These errors are rectified in the code below.
+
+```{r}
+loan <- mutate(loan, temp = Employment.Duration, Employment.Duration = Home.Ownership, Home.Ownership=temp, Verification.Status = recode(Verification.Status, "Source Verified" = "Verified")) %>%
+  select(-temp)
+```
+
+Overall, the dataset contains 67463 rows and 35 columns. Now, we can begin to visualise the relationships between the different variables.
+
+## How do Default Rates Differ across the Different Grades?
+
+Firstly, I would like visualize the proportion of customers that default on their loans at each of the grading. The bank grades the loan on a 7 letter scale from "A" to "G". "A" grade loans have the lowest expected risk of default and "G" grade loans have the highest expected risk of default, as determined by the bank.(https://blog.groundfloor.com/groundfloorblog/about-loan-grading). In this dataset, a Loan.status of 1 indicates that the customer has defaulted on the loan, and 0 indicates otherwise. The Default Rate per Grade can be obtained by summing up the Loan.Status in the Grade and dividing it by the number of rows in the respective grade before multiplying by 100 to obtain the percentage.
+
+```{r}
+loan_grade <- group_by(loan, Grade) %>%
+  summarise(prop_default = sum(Loan.Status)/n()*100)
+
+ggplot(loan_grade, aes(x=Grade,y=prop_default))+
+  geom_col(fill="red")+
+  ylab("Default Rate (%)")+
+  labs(title = "Default Rate per Grade")
+```
+
+Generally, there is an increasing trend in loan default rates as we go from grade "A" to grade "G". However, the increase is rather small at around 2 percentage points.
+
+## Do Grades Affect the Interest Rate of the Loan?
+
+Next, I would like to visualize the effect of Grades on the Interest Rate of the loan.A boxplot showing the distribution of Interest Rates is plotted for each Grade.
+
+```{r}
+ggplot(loan, aes(x=Grade, y= Interest.Rate))+
+  geom_boxplot()+
+  labs(title="Distribution of Interest Rates according to Grade")+
+  ylab("Interest Rate")+
+  coord_flip()
+```
+
+From the plot, it can be seen that the interest rates do not differ by much across the different grades, and there is no observable trend in Interest Rates across the grades. Interest rates skew right across all grades.
+
+## How do Interest Rates Affect the Default Rates?
+
+In the next plot, we investigate the distribution of Interest Rates in loans which are defaulted and loans that are not.
+
+```{r}
+ggplot(loan, aes(x=Interest.Rate))+
+  geom_density(aes(color=factor(Loan.Status)))+
+  xlab("Interest Rate")+
+  ylab("Proportion")+
+  labs(title="Distribution of Interest Rate according to Loan Status")+
+  scale_color_discrete(name="Loan Status", labels=c("Non-Defaulters", "Defaulters"))
+```
+
+Based on the density plot, interest rates for loans which end up being defaulted follow a similar distribution when compared to loans which are not defaulted. 
+
+## Does Home Ownership Have an Effect on Default Rates?
+
+Customers are categorised into 3 groups of Home Ownership status, namely "Mortgage", "Own" and "Rent".
+
+```{r}
+loan_home <- group_by(loan, Home.Ownership) %>%
+  summarise(prop_default = sum(Loan.Status)/n()*100)
+
+ggplot(loan_home, aes(x=Home.Ownership,y=prop_default))+
+  geom_col(fill="blue")+
+  ylab("Default Rate (%)")+
+  xlab("Home Ownership")+
+  labs(title = "Default Rate according to Home Ownership")
+```
+
+It can be seen that customers whose Home Ownership Status is "Mortgage" have the lowest default rate, while those with "Own" status have the highest default rate.
+
+## Exploring the Relationship between Employment Duration and Debit to Income Ratio for Defaulters
+
+```{r}
+loan_default <- filter(loan, Loan.Status==1)
+ggplot(loan_default,aes(x=Employment.Duration, y=Debit.to.Income))+
+  geom_point()+
+  geom_smooth(method="lm", se=FALSE)+
+  scale_x_log10()
+
+```
+
+It can be seen that for customers who defaulted on their loans, higher employment duration is associated with higher debt-to-income ratio, although the linear relationship is weak.
+
+## Conclusion
+
+This Exploratory Data Analysis has allowed us to correct the errors in the dataset and helped explore the relationship between variables such as Grades, Employment Duration, Debit-to-Income ratio , Home Ownership, Interest Rates and Default Rates. This would be a helpful first step towards building a Machine Learning model with the aim of predicting whether customers would default on their loans.
