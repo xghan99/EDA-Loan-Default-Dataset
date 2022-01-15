@@ -4,4 +4,4 @@ This is an Exploratory Data Analysis of the Loan Default Dataset. The dataset is
 
 Github Page: https://xghan99.github.io/EDA-Loan-Default-Dataset/
 
-Tableau Workbook: https://public.tableau.com/views/LoanDefaultDataset/Dashboard1?:language=en-US&publish=yes&:display_count=n&:origin=viz_share_link
+
